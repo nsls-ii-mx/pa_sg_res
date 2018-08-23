@@ -1,0 +1,133 @@
+#!/bin/bash
+#
+#  pa_sg_res
+#    By Wuxian Shi, 13 Feb 2017
+#    adapted to keyword arguments by H. J. Bernstein
+#
+
+tempfiles=( )
+cleanup() {
+  if [ "${logfile}XX" == "XX" ]
+    then
+      logfile=pa_sg_res.log
+  fi 
+  echo "POINTLESS LOG:" >> $logfile
+  echo "=======================================================================================" >> $logfile
+  cat /tmp/pointless$$.log >> $logfile
+  echo "=======================================================================================" >> $logfile
+  echo "=======================================================================================" >> $logfile
+  echo "AIMLESS LOG:" >> $logfile
+  echo "=======================================================================================" >> $logfile
+  cat /tmp/aimless$$.log >> $logfile
+
+  echo "logfile in $logfile"
+  rm -f "${tempfiles[@]}"
+}
+trap cleanup 0
+
+error() {
+  local parent_lineno="$1"
+  local message="$2"
+  local code="${3:-1}"
+  if [[ -n "$message" ]] ; then
+    echo "Error on or near line ${parent_lineno}: ${message}; exiting with status ${code}"
+  else
+    echo "Error on or near line ${parent_lineno}; exiting with status ${code}"
+  fi
+  exit "${code}"
+}
+trap 'error ${LINENO}' ERR
+
+touch /tmp/pointless$$.log
+tempfiles+=( "/tmp/pointless$$.log" )
+touch /tmp/aimless$$.log
+tempfiles+=( "/tmp/aimless$$.log" )
+
+
+if [ XX$1 == "XX--help" ]
+  then
+  echo "pa_sg_res [-r<reslow>] [-R<reshigh>] [-S<spacegroup>] [-i<infile>] [-o<outfile>] [-l<logfile>]" >&2
+  echo "infile defaults to XDS_ASCII.HKL, oufile to aimless.mtz" >&2
+  exit -1
+fi
+
+while getopts ":r:R:S:h:o:l:" opt; do
+  case $opt in
+    r) reslow="$OPTARG"
+    ;;
+    R) reshigh="$OPTARG"
+    ;;
+    S) spacegroup="$OPTARG"
+    ;;
+    i) infile="$OPTARG"
+    ;;
+    o) outfile="$OPTARG"
+    ;;
+    l) logfile="$OPTARG"
+    ;;
+    h)
+       echo "pa_sg_res [-r<reslow>] [-R<reshigh>] [-S<spacegroup>] [-i<infile>] [-o<outfile>] [-l<logfile>]" >&2
+       echo "file defaults to XDS_ASCII.HKL" >&2
+       exit -1
+    ;;
+    \?) echo "Invalid option -$OPTARG" >&2
+    ;;
+  esac
+done
+
+if [ "${infile}XX" == "XX" ]
+  then
+    infile=XDS_ASCII.HKL
+fi 
+
+if [ "${outfile}XX" == "XX" ]
+  then
+    outfile=aimless.mtz
+fi 
+
+if [ "${logfile}XX" == "XX" ]
+  then
+    logfile=pa_sg_res.log
+fi 
+
+
+spacegroup_arg="spacegroup $spacegroup"
+if [ "${spacegroup}XX" == "XX" ]
+  then
+    spacegroup_arg=${spacegroup}
+fi 
+
+resolution_arg="resolution low $reslow high $reshigh"
+if [ "${reslow}XX" == "XX" ]
+  then
+    resolution_arg="resolution high $reshigh"
+    if [ "${reshigh}XX" == "XX" ]
+    then
+      resolution_arg=""
+    fi
+elif [ "${reshigh}XX" == "XX" ]
+  then
+    resolution_arg="resolution low $reslow"
+fi 
+
+
+
+pointless xdsin $infile hklout /tmp/pa_sg_res_pointless$$.mtz << lla | tee /tmp/pointless$$.log
+$spacegroup_arg
+lla
+
+aimless hklin /tmp/pa_sg_res_pointless$$.mtz hklout $outfile << eof | tee /tmp/aimless$$.log
+$resolution_arg
+onlymerge
+eof
+
+echo "POINTLESS LOG:" >> $logfile
+echo "=======================================================================================" >> $logfile
+cat /tmp/pointless$$.log >> $logfile
+echo "=======================================================================================" >> $logfile
+echo "=======================================================================================" >> $logfile
+echo "AIMLESS LOG:" >> $logfile
+echo "=======================================================================================" >> $logfile
+cat /tmp/aimless$$.log >> $logfile
+
+
